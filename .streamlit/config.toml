@@ -1,0 +1,13 @@
+# SnapClass theme — deep-space "Aurora Glass" (matches src/ui/theme.py)
+[theme]
+base = "dark"
+primaryColor = "#5865F2"
+backgroundColor = "#060913"
+secondaryBackgroundColor = "#0D1330"
+textColor = "#E9ECFB"
+
+[client]
+toolbarMode = "minimal"
+
+[browser]
+gatherUsageStats = false

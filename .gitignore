@@ -17,5 +17,5 @@ Thumbs.db
 *.sqlite3
 *.db
 
-# Streamlit secrets and configuration
-.streamlit/
+# Streamlit secrets (never commit). config.toml IS committed — it carries the app theme.
+.streamlit/secrets.toml

@@ -1,6 +1,7 @@
 import streamlit as st
 
 from src.ui.base_layout import style_background_dashboard, style_base_layout
+from src.ui.theme import section_header, scroll_progress, welcome_banner
 
 from src.components.header import header_dashboard
 from src.components.footer import footer_dashboard
@@ -17,23 +18,25 @@ from src.components.subject_card import subject_card
 def student_dashboard():
     student_data = st.session_state.student_data
     student_id = student_data['student_id']
+    scroll_progress()
+
     c1, c2 = st.columns(2, vertical_alignment='center', gap='xxlarge')
     with c1:
         header_dashboard()
     with c2:
-        st.subheader(f"""Welcome, {student_data['name']} """)
+        welcome_banner(student_data['name'], role='Student')
         if st.button("Logout", type='secondary', key='loginbackbtn', shortcut="control+backspace"):
             st.session_state['is_logged_in'] = False
-            del st.session_state.student_data 
+            del st.session_state.student_data
             st.rerun()
 
 
     st.space()
 
-    c1, c2 =st.columns(2)
-    with c1:
-        st.header('Your Enrolled Subjects')
-    with c2:
+    col1, col2 = st.columns([2, 1], vertical_alignment='bottom')
+    with col1:
+        section_header("🎒", "Your Enrolled Subjects", "Live attendance across all your classes.")
+    with col2:
         if st.button('Enroll in Subject', type='primary', width='stretch'):
             enroll_dialog()
 
@@ -65,9 +68,11 @@ def student_dashboard():
         sid = sub['subject_id']
 
 
-        stats = stats_map.get(sid,{"total":0, "attended": 0} )
-        def unenroll_button():
-                if st.button("Unenroll from tihs course", type='tertiary', width='stretch', icon=':material/delete_forever:'):
+        stats = stats_map.get(sid, {"total":0, "attended": 0} )
+
+        # default-arg binding + unique key so every card has its own button
+        def unenroll_button(sid=sid, sub=sub):
+                if st.button("Unenroll from this course", key=f"unenroll_{sid}", type='tertiary', width='stretch', icon=':material/delete_forever:'):
                     unenroll_student_to_subject(student_id, sid)
                     st.toast(f"Unenrolled from {sub['name']} successfully!")
                     st.rerun()
@@ -76,28 +81,30 @@ def student_dashboard():
 
             subject_card(
                 name = sub['name'],
-                code =sub['subject_code'],
+                code = sub['subject_code'],
                 section = sub['section'],
                 stats = [
                     ('📅', 'Total', stats['total']),
                     ('✅', 'Attended', stats['attended']),
                 ],
-                footer_callback=unenroll_button
+                progress = (stats['attended'], stats['total']),
+                footer_kind = 'danger',
+                footer_callback = unenroll_button
             )
     footer_dashboard()
 
 
 def student_screen():
 
-
-    style_background_dashboard()
     style_base_layout()
+    style_background_dashboard()
+    scroll_progress()
 
 
     if "student_data" in st.session_state:
         student_dashboard()
         return
-    
+
     c1, c2 = st.columns(2, vertical_alignment='center', gap='xxlarge')
     with c1:
         header_dashboard()
@@ -106,10 +113,9 @@ def student_screen():
             st.session_state['login_type'] = None
             st.rerun()
 
-    st.header('Login using FaceID', text_alignment='center')
+    section_header("👤", "Login with FaceID", "Position your face in the center of the frame — no password needed.", centered=True)
     st.space()
-    st.space()
-    
+
     show_registration = False
     photo_source = st.camera_input("Position your face in the center")
 
@@ -140,49 +146,48 @@ def student_screen():
                     st.info('Face not recognized! You might be a new student!')
                     show_registration = True
     if show_registration:
-        with st.container(border=True):
-            st.header('Register new Profile')
-            new_name = st.text_input("Enter your name", placeholder='E.g. Hamza Rizvi')
+        st.divider()
+        section_header("🪪", "Create Your Profile", "Register your face (and optionally your voice) to join classes.")
+        new_name = st.text_input("Enter your name", placeholder='E.g. Hamza Rizvi')
 
-            st.subheader('Optional : Voice Enrollment')
-            st.info("Enroll your for voice only attendance")
-
-
-            audio_data = None
-
-            try:
-                audio_data = st.audio_input('Record a short phrase like I am present, My name is Akash.')
-            except Exception:
-                st.error('Audio Data failed!')
-
-            if st.button('Create Account', type='primary'):
-                if new_name:
-                    with st.spinner('Creating profile..'):
-                        img = np.array(Image.open(photo_source))
-                        encodings= get_face_embeddings(img)
-                        if encodings:
-                            face_emb = encodings[0].tolist()
-
-                            voice_emb = None
-                            if audio_data:
-                                voice_emb = get_voice_embedding(audio_data.read())
-
-                            response_data = create_student(new_name, face_embedding=face_emb, voice_embedding=voice_emb)
-
-                            if response_data:
-                                train_classifier()
-                                st.session_state.is_logged_in = True
-                                st.session_state.user_role = 'student'
-                                st.session_state.student_data = response_data[0]
-                                st.toast(f'Profile Created! Hi {new_name}!')
-                                time.sleep(1)
-                                st.rerun()
-                        else:
-                            st.error('Couldnt capture your facial features for registration')
-
-                else:
-                    st.warning('Please enter your name!')
+        st.subheader('Optional : Voice Enrollment')
+        st.info("Enroll your voice for voice-only attendance")
 
 
-        
+        audio_data = None
+
+        try:
+            audio_data = st.audio_input('Record a short phrase like I am present, My name is Akash.')
+        except Exception:
+            st.error('Audio Data failed!')
+
+        if st.button('Create Account', type='primary'):
+            if new_name:
+                with st.spinner('Creating profile..'):
+                    img = np.array(Image.open(photo_source))
+                    encodings= get_face_embeddings(img)
+                    if encodings:
+                        face_emb = encodings[0].tolist()
+
+                        voice_emb = None
+                        if audio_data:
+                            voice_emb = get_voice_embedding(audio_data.read())
+
+                        response_data = create_student(new_name, face_embedding=face_emb, voice_embedding=voice_emb)
+
+                        if response_data:
+                            train_classifier()
+                            st.session_state.is_logged_in = True
+                            st.session_state.user_role = 'student'
+                            st.session_state.student_data = response_data[0]
+                            st.toast(f'Profile Created! Hi {new_name}!')
+                            time.sleep(1)
+                            st.rerun()
+                    else:
+                        st.error('Couldn\'t capture your facial features for registration')
+
+            else:
+                st.warning('Please enter your name!')
+
+
     footer_dashboard()
